@@ -211,6 +211,20 @@ input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--brand); cu
 .modal label { display: flex; gap: 8px; align-items: center; margin: 12px 0; font-size: 13px; }
 .toast { position: fixed; top: 64px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); z-index: 40; max-width: 380px; font-size: 13px; display: none; }
 .toast.err { border-left-color: var(--critical); }
+.prog { height: 14px; border-radius: 7px; background: var(--free); overflow: hidden; margin: 16px 0 8px; }
+.progfill { height: 100%; width: 0; border-radius: 7px; background: linear-gradient(90deg, var(--brand-2), var(--accent)); transition: width .4s; position: relative; overflow: hidden; }
+.progfill.busy::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); animation: sweep 1.2s linear infinite; }
+.prog:has(.progfill.busy[style*="width: 0%"]) { background: repeating-linear-gradient(-45deg, var(--free) 0 10px, var(--hover) 10px 20px); background-size: 28px 28px; animation: stripes .8s linear infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes stripes { to { background-position: 28px 0; } }
+.progrow { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--text-2); }
+.progrow b { font-size: 22px; color: var(--text); }
+.progcur { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; min-height: 18px; margin: 6px 0 14px; }
+.progstats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+.progstats div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.progstats b { display: block; font-size: 16px; }
+.progstats small { color: var(--muted); font-size: 11px; }
+@media (max-width: 560px) { .progstats { grid-template-columns: repeat(2, 1fr); } }
 #tip { position: fixed; pointer-events: none; background: var(--text); color: var(--bg); padding: 6px 10px; border-radius: 8px; font-size: 12px; z-index: 50; display: none; max-width: 320px; }
 #tip b { display: block; }
 
@@ -472,18 +486,65 @@ function confirmDelete() {
   $("#perm").onchange = e => $("#dgo").textContent = e.target.checked ? "Delete permanently" : (S.windows ? "Move to Recycle Bin" : "Move to Trash");
   $("#dcancel").onclick = closeModal;
   $("#dgo").onclick = async () => {
-    $("#dgo").disabled = true; $("#delmsg").textContent = "Deleting…";
+    $("#dgo").disabled = true;
     try {
-      const j = await api("/api/delete", {paths: items.map(([p]) => p), permanent: $("#perm").checked});
-      const ok = j.results.filter(r => r.ok), bad = j.results.filter(r => !r.ok);
-      let freed = 0; for (const r of ok) { freed += S.sel.get(r.path) || 0; S.sel.delete(r.path); }
-      updateSel(); closeModal(); render(); loadDrives();
-      if (bad.length) toast(`${ok.length} deleted (${fmt(freed)}). ${bad.length} failed: ${bad[0].error}${bad.length > 1 ? " …" : ""}`, true);
-      else toast(`Deleted ${ok.length} item${ok.length > 1 ? "s" : ""}, ${fmt(freed)}.`);
+      const j = await api("/api/delete", {items: items.map(([path, size]) => ({path, size})), permanent: $("#perm").checked});
+      deleteProgress(j.job);
     } catch (e) { $("#delmsg").textContent = e.message; $("#dgo").disabled = false; }
   };
 }
-function closeModal() { $("#modalbg").classList.remove("show"); }
+let deleting = false;
+function deleteProgress(id) {
+  deleting = true;
+  const m = $("#modal");
+  m.innerHTML = `<header id="dhead">Deleting…</header>
+    <div class="body">
+      <div class="prog"><div class="progfill" id="pfill"></div></div>
+      <div class="progrow"><b id="ppct" class="num">0%</b><span id="pcount" class="num"></span></div>
+      <div class="progcur" id="pcur"></div>
+      <div class="progstats">
+        <div><b id="pfreed" class="num">0 B</b><small>freed</small></div>
+        <div><b id="pfiles" class="num">0</b><small>files deleted</small></div>
+        <div><b id="pskip" class="num">0</b><small>skipped (in use)</small></div>
+        <div><b id="ptime" class="num">0s</b><small>elapsed</small></div>
+      </div>
+      <div id="presult"></div>
+    </div>
+    <div class="foot"><span id="pnote" class="note" style="flex:1;margin:0"></span><button class="btn" id="pstop">Stop</button></div>`;
+  $("#pstop").onclick = () => { api("/api/job/cancel", {id}); $("#pstop").disabled = true; $("#pstop").textContent = "Stopping…"; };
+  const tick = async () => {
+    let st;
+    try { st = await api("/api/job?id=" + id); } catch (e) { $("#pnote").textContent = e.message; return setTimeout(tick, 1000); }
+    const p = st.total ? Math.min(100, 100 * st.done / st.total) : (st.state === "running" ? 0 : 100);
+    $("#pfill").style.width = p + "%";
+    $("#pfill").classList.toggle("busy", st.state === "running");
+    $("#ppct").textContent = p.toFixed(p < 10 ? 1 : 0) + "%";
+    $("#pcount").textContent = `item ${st.index} of ${st.count} · ${fmt(st.done)} of ${fmt(st.total)}`;
+    $("#pcur").textContent = st.state === "running" ? st.current : "";
+    $("#pcur").title = st.current;
+    $("#pfreed").textContent = fmt(st.freed);
+    $("#pfiles").textContent = st.permanent ? fmtN(st.files) : "–";
+    $("#pskip").textContent = st.permanent ? fmtN(st.skipped) : "–";
+    $("#ptime").textContent = fmtT(st.elapsed);
+    if (st.state === "running") {
+      $("#pnote").textContent = st.permanent ? "" : `Moving to the ${S.windows ? "Recycle Bin" : "Trash"}; big folders take a while and update per item.`;
+      return setTimeout(tick, 400);
+    }
+    deleting = false;
+    const ok = st.results.filter(r => r.ok), bad = st.results.filter(r => !r.ok);
+    for (const r of ok) S.sel.delete(r.path);
+    updateSel();
+    $("#dhead").textContent = st.state === "cancelled" ? "Stopped" : bad.length ? "Finished with some problems" : "All done ✓";
+    $("#presult").innerHTML = bad.length ? `<div class="warnbox" style="margin-top:12px"><b>${bad.length} item${bad.length > 1 ? "s" : ""} not fully deleted:</b><ul>${bad.slice(0, 50).map(r => `<li><span>${esc(r.path)}</span><span>${esc(r.error)}</span></li>`).join("")}</ul>${st.skipped ? "Files in use are usually held by a running app. Close it (or reboot) and run the cleanup again." : ""}</div>` : "";
+    $("#pnote").textContent = `${ok.length} of ${st.count} items removed${!st.permanent && S.windows ? ". Empty the Recycle Bin to actually free the space." : "."}`;
+    const b = $("#pstop"); b.disabled = false; b.textContent = "Close"; b.classList.add("primary");
+    b.onclick = () => { closeModal(); render(); loadDrives(); };
+    toast(`Freed ${fmt(st.freed)}${bad.length ? `, ${bad.length} item(s) had problems` : ""}.`, bad.length > 0);
+    render(); loadDrives();
+  };
+  tick();
+}
+function closeModal() { if (!deleting) $("#modalbg").classList.remove("show"); }
 $("#modalbg").onclick = e => { if (e.target.id === "modalbg") closeModal(); };
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
@@ -732,5 +793,6 @@ loadDrives().then(() => {
   } else render();
 }).catch(e => toast(e.message, true));
 </script>
+<p style="position:fixed;bottom:4px;left:0;right:0;text-align:center;font-size:11px;color:var(--muted);z-index:9999;margin:0;pointer-events:none;"><span style="pointer-events:auto;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:3px 12px;">Thanks &nbsp;<a href="https://paypal.me/jestie129" target="_blank" rel="noopener noreferrer" style="color:var(--brand);text-decoration:none;font-weight:600;">☕ Buy me a coffee</a> &nbsp;·&nbsp; created by Jestie</span></p>
 </body>
 </html>

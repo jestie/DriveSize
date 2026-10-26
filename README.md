@@ -1,5 +1,7 @@
 # DriveSize
 
+**Website:** https://jestie.github.io/DriveSize/
+
 A TreeSize-style disk usage explorer: drive overview, donut charts, folder
 drill-down, file types, largest files, cleanup suggestions, duplicate finder,
 and delete (Recycle Bin by default).
@@ -24,3 +26,10 @@ It opens `http://127.0.0.1:8765/` in your browser. Ctrl+C in the terminal stops 
 - Cleanup verdicts are heuristics: "Safe" = temp/cache folders apps rebuild;
   "Review" = probably unneeded (installers, logs, venvs, node_modules, old media).
   Nothing inside system areas is ever suggested.
+
+Permanent deletes run file by file with a live progress bar; files held open by
+running apps are skipped and reported rather than aborting the whole folder.
+
+---
+
+Created by Jestie · [☕ Buy me a coffee](https://paypal.me/jestie129)

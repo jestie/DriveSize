@@ -446,6 +446,17 @@ class Scan:
                 g["waste"] = g["size"] * max(0, len(g["paths"]) - 1)
             self.dupes = [g for g in self.dupes if len(g["paths"]) > 1]
 
+    def shrink(self, path, size, files, cats):
+        """A folder was only partly deleted (files in use): subtract what went."""
+        with self.lock:
+            n = self.find_node(path)
+            while n is not None:
+                n.size -= size
+                n.files -= files
+                for i in range(NCAT):
+                    n.cats[i] -= cats[i]
+                n = n.parent
+
 
 SCANS = {}
 SCAN_LOCK = threading.Lock()
@@ -540,24 +551,163 @@ def trash_linux(path):
     os.rename(path, os.path.join(base, "files", target))
 
 
-def remove(path, permanent):
-    why = protected(path)
-    if why:
-        raise PermissionError(why)
-    is_dir = os.path.isdir(path) and not os.path.islink(path)
-    size = 0 if is_dir else os.path.getsize(path)
-    if permanent:
-        if is_dir:
-            shutil.rmtree(path)
+def _is_link(e):
+    if e.is_symlink():
+        return True
+    if IS_WIN and e.is_dir(follow_symlinks=False):
+        if getattr(e, "is_junction", lambda: False)():
+            return True
+        return bool(e.stat(follow_symlinks=False).st_file_attributes
+                    & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    return False
+
+
+def _remove_file(p):
+    try:
+        os.remove(p)
+    except PermissionError:
+        if not IS_WIN:
+            raise
+        os.chmod(p, stat.S_IWRITE)   # read-only files refuse deletion on Windows
+        os.remove(p)
+
+
+class DeleteJob:
+    """Deletes items in a background thread so the UI can show progress.
+
+    Permanent folder deletes go file by file: files in use are skipped and
+    counted instead of aborting the whole folder like shutil.rmtree would.
+    """
+
+    def __init__(self, items, permanent):
+        self.id = secrets.token_hex(6)
+        self.items = items              # [{"path", "size"}]
+        self.permanent = permanent
+        self.total = sum(max(0, int(i.get("size") or 0)) for i in items)
+        self.state = "running"
+        self.index = 0
+        self.current = ""
+        self.done_bytes = 0             # bytes accounted for (progress bar)
+        self.freed = 0
+        self.files = 0
+        self.skipped = 0
+        self.results = []
+        self.cancel = False
+        self.started = time.time()
+        self.finished = None
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def status(self):
+        return {"id": self.id, "state": self.state, "index": self.index,
+                "count": len(self.items), "current": self.current,
+                "total": self.total, "done": self.done_bytes, "freed": self.freed,
+                "files": self.files, "skipped": self.skipped,
+                "permanent": self.permanent, "results": self.results,
+                "elapsed": (self.finished or time.time()) - self.started}
+
+    def _run(self):
+        for i, item in enumerate(self.items):
+            if self.cancel:
+                break
+            self.index = i + 1
+            path = os.path.abspath(item["path"])
+            self.current = path
+            base = self.done_bytes
+            try:
+                self._one(path)
+                self.results.append({"path": item["path"], "ok": True})
+            except Exception as e:  # noqa: BLE001 - reported per item
+                self.results.append({"path": item["path"], "ok": False, "error": str(e)})
+            self.done_bytes = max(self.done_bytes, base + max(0, int(item.get("size") or 0)))
+        self.finished = time.time()
+        self.state = "cancelled" if self.cancel else "done"
+
+    def _one(self, path):
+        why = protected(path)
+        if why:
+            raise PermissionError(why)
+        if not os.path.lexists(path):
+            return                       # already gone (e.g. inside an earlier item)
+        is_dir = os.path.isdir(path) and not os.path.islink(path)
+        size = 0 if is_dir else os.path.getsize(path)
+        scan = scan_for(path)
+        if not self.permanent:
+            recycle_windows(path) if IS_WIN else trash_linux(path)
+            self.freed += size if not is_dir else (scan_node_size(scan, path) or 0)
+        elif not is_dir:
+            _remove_file(path)
+            self.freed += size
+            self.files += 1
+            self.done_bytes += size
         else:
-            os.remove(path)
-    elif IS_WIN:
-        recycle_windows(path)
-    else:
-        trash_linux(path)
-    s = scan_for(path)
-    if s:
-        s.forget(os.path.abspath(path), is_dir, size)
+            freed, files, cats = self._purge(path)
+            if os.path.exists(path):
+                if scan:
+                    scan.shrink(path, freed, files, cats)
+                if self.cancel:
+                    return
+                raise OSError("Partly deleted: %d files were in use or locked and were left"
+                              % self._item_skipped)
+        if scan:
+            scan.forget(path, is_dir, size)
+
+    def _purge(self, root):
+        freed = files = 0
+        cats = [0] * NCAT
+        skipped_before = self.skipped
+        stack = [(root, False)]
+        while stack and not self.cancel:
+            d, visited = stack.pop()
+            if visited:
+                try:
+                    os.rmdir(d)
+                except OSError:
+                    pass                 # still holds skipped files
+                continue
+            stack.append((d, True))
+            self.current = d
+            try:
+                it = os.scandir(d)
+            except OSError:
+                self.skipped += 1
+                continue
+            with it:
+                for e in it:
+                    if self.cancel:
+                        break
+                    try:
+                        if _is_link(e):
+                            try:
+                                os.unlink(e.path)
+                            except OSError:
+                                os.rmdir(e.path)
+                            continue
+                        if e.is_dir(follow_symlinks=False):
+                            stack.append((e.path, False))
+                            continue
+                        sz = e.stat(follow_symlinks=False).st_size
+                        _remove_file(e.path)
+                        freed += sz
+                        files += 1
+                        cats[_EXT.get(ext_of(e.name), OTHER)] += sz
+                        self.freed += sz
+                        self.files += 1
+                        self.done_bytes += sz
+                    except OSError:
+                        self.skipped += 1
+        self._item_skipped = self.skipped - skipped_before
+        return freed, files, cats
+
+
+def scan_node_size(scan, path):
+    if scan is None:
+        return None
+    with scan.lock:
+        n = scan.find_node(path)
+        return n.size if n else None
+
+
+JOBS = {}
 
 
 # ---------------------------------------------------------------------- API
@@ -665,6 +815,11 @@ class Handler(BaseHTTPRequestHandler):
         if not self._authed():
             return self._send(403, {"error": "bad token"})
         try:
+            if u.path == "/api/job":
+                job = JOBS.get(q.get("id", ""))
+                if job is None:
+                    return self._send(404, {"error": "no such job"})
+                return self._send(200, job.status())
             if u.path == "/api/drives":
                 return self._send(200, {"drives": list_drives(), "windows": IS_WIN,
                                         "scans": [api_status(s) for s in SCANS.values()]})
@@ -713,14 +868,15 @@ class Handler(BaseHTTPRequestHandler):
                 s.cancel = True
             return self._send(200, {"ok": True})
         if u.path == "/api/delete":
-            results = []
-            for p in body.get("paths", []):
-                try:
-                    remove(p, bool(body.get("permanent")))
-                    results.append({"path": p, "ok": True})
-                except Exception as e:  # noqa: BLE001
-                    results.append({"path": p, "ok": False, "error": str(e)})
-            return self._send(200, {"results": results})
+            items = [i for i in body.get("items", []) if isinstance(i, dict) and i.get("path")]
+            job = DeleteJob(items, bool(body.get("permanent")))
+            JOBS[job.id] = job
+            return self._send(200, {"job": job.id})
+        if u.path == "/api/job/cancel":
+            job = JOBS.get(body.get("id", ""))
+            if job:
+                job.cancel = True
+            return self._send(200, {"ok": True})
         if u.path == "/api/reveal":
             p = body.get("path", "")
             if IS_WIN and os.path.exists(p):

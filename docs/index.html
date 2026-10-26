@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriveSize · See where your disk space went</title>
+<meta name="description" content="DriveSize is a free, open-source TreeSize-style disk explorer: donut charts, folder drill-down, cleanup suggestions and safe deletes. No install, just Python.">
+<meta property="og:title" content="DriveSize · See where your disk space went">
+<meta property="og:description" content="Map every drive in seconds, find the junk, and clean it up safely.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%2300837B' stroke-width='6'/%3E%3Cpath d='M16 5a11 11 0 0 1 11 11' fill='none' stroke='%2300BF63' stroke-width='6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #050912; --bg-2: #0a1222; --card: rgba(255,255,255,.04); --line: rgba(255,255,255,.09);
+  --text: #eef3fb; --text-2: #a9b5c9; --muted: #6c7a92;
+  --blue: #2f6bff; --deep: #00339A; --teal: #00a5a0; --green: #00BF63; --lime: #7dffb3;
+  --grad: linear-gradient(100deg, #4f8bff 0%, #18c6c0 45%, #2fe58a 75%, #b6ff8a 100%);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 Inter, "Segoe UI", system-ui, sans-serif; overflow-x: clip;
+}
+a { color: inherit; }
+h1, h2, h3, .display { font-family: "Space Grotesk", Inter, sans-serif; letter-spacing: -.02em; }
+.wrap { width: min(1180px, 100% - 32px); margin: 0 auto; position: relative; }
+
+/* ---------- background ---------- */
+#stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.aurora { position: fixed; inset: -20vmax; z-index: 0; pointer-events: none; filter: blur(80px); opacity: .55; }
+.aurora i { position: absolute; border-radius: 50%; mix-blend-mode: screen; animation: drift 22s ease-in-out infinite alternate; }
+.aurora i:nth-child(1) { width: 55vmax; height: 55vmax; left: 5%; top: 0; background: radial-gradient(circle, #0040d0 0%, transparent 65%); }
+.aurora i:nth-child(2) { width: 45vmax; height: 45vmax; right: 0; top: 10%; background: radial-gradient(circle, #008a86 0%, transparent 65%); animation-duration: 28s; animation-delay: -6s; }
+.aurora i:nth-child(3) { width: 40vmax; height: 40vmax; left: 30%; top: 45%; background: radial-gradient(circle, #00a85a 0%, transparent 65%); animation-duration: 32s; animation-delay: -12s; }
+@keyframes drift { 0% { transform: translate(0,0) scale(1); } 50% { transform: translate(6vmax,-4vmax) scale(1.15); } 100% { transform: translate(-5vmax,5vmax) scale(.95); } }
+.grid-floor {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 55vh; z-index: 0; pointer-events: none; opacity: .22;
+  background-image: linear-gradient(rgba(80,160,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(80,160,255,.5) 1px, transparent 1px);
+  background-size: 60px 60px; transform: perspective(500px) rotateX(62deg); transform-origin: bottom;
+  mask-image: linear-gradient(to top, #000 0%, transparent 85%); -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 85%);
+  animation: floor 4s linear infinite;
+}
+@keyframes floor { to { background-position: 0 60px, 0 0; } }
+main, nav, footer { position: relative; z-index: 1; }
+
+/* ---------- nav ---------- */
+nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: rgba(5,9,18,.55); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 19px "Space Grotesk", sans-serif; text-decoration: none; }
+.brand svg { width: 28px; height: 28px; animation: spin 6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+nav .links { display: flex; gap: 22px; align-items: center; font-size: 14px; color: var(--text-2); }
+nav .links a { text-decoration: none; transition: color .2s; }
+nav .links a:hover { color: var(--text); }
+.ghbtn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text) !important; }
+.ghbtn:hover { border-color: rgba(255,255,255,.25); }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; min-height: min(calc(100vh - 64px), 900px); padding: 40px 0 60px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--lime); border: 1px solid rgba(125,255,179,.25); background: rgba(125,255,179,.06); border-radius: 999px; padding: 6px 14px; }
+.eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px var(--lime); animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; transform: scale(.7); } }
+h1 { font-size: clamp(44px, 7vw, 88px); line-height: .98; margin: 22px 0 22px; font-weight: 700; }
+.shine { background: var(--grad); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 6s ease-in-out infinite alternate; }
+@keyframes shine { to { background-position: 100% 0; } }
+.lede { font-size: clamp(17px, 2vw, 20px); color: var(--text-2); max-width: 540px; margin: 0 0 34px; }
+.typed { color: var(--text); font-weight: 600; border-right: 2px solid var(--lime); padding-right: 3px; animation: caret 1s step-end infinite; white-space: nowrap; }
+@keyframes caret { 50% { border-color: transparent; } }
+.ctas { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.btn {
+  position: relative; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 600;
+  padding: 16px 26px; border-radius: 14px; font-size: 16px; transition: transform .2s, box-shadow .3s; isolation: isolate;
+}
+.btn.primary { color: #03140b; background: var(--grad); background-size: 200% 100%; box-shadow: 0 10px 40px -8px rgba(47,229,138,.55), inset 0 1px 0 rgba(255,255,255,.5); animation: shine 4s ease-in-out infinite alternate; }
+.btn.primary::before { content: ""; position: absolute; inset: -3px; border-radius: 17px; background: var(--grad); filter: blur(18px); opacity: .55; z-index: -1; transition: opacity .3s; }
+.btn.primary:hover { transform: translateY(-3px) scale(1.02); }
+.btn.primary:hover::before { opacity: .95; }
+.btn.primary .arrow { transition: transform .25s; }
+.btn.primary:hover .arrow { transform: translateX(5px); }
+.btn.ghost { color: var(--text); border: 1px solid var(--line); background: var(--card); }
+.btn.ghost:hover { border-color: rgba(255,255,255,.3); transform: translateY(-2px); }
+.ticks { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 26px; font-size: 13px; color: var(--muted); }
+.ticks span::before { content: "✓ "; color: var(--green); font-weight: 700; }
+
+/* the reactor donut */
+.orb { position: relative; aspect-ratio: 1; width: min(520px, 100%); margin: 0 auto; }
+.orb svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ring { transform-origin: 250px 250px; }
+.r1 { animation: spin 40s linear infinite; }
+.r2 { animation: spin 26s linear infinite reverse; }
+.r3 { animation: spin 60s linear infinite; }
+.seg { stroke-linecap: round; fill: none; filter: url(#glow); stroke-dasharray: 0 1000; animation: draw 2.2s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes draw { to { stroke-dasharray: var(--len) 1000; } }
+.sweep { transform-origin: 250px 250px; animation: spin 4s linear infinite; }
+.core { font: 700 50px "Space Grotesk", sans-serif; fill: #fff; }
+.core-sub { font: 500 14px Inter, sans-serif; fill: var(--text-2); letter-spacing: .2em; }
+.chip {
+  position: absolute; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; font-size: 13px; font-weight: 600;
+  background: rgba(12,20,36,.75); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0,0,0,.4); animation: float 6s ease-in-out infinite; white-space: nowrap;
+}
+.chip b { font-weight: 700; }
+.chip .sw { width: 10px; height: 10px; border-radius: 3px; }
+.chip small { color: var(--text-2); font-weight: 500; }
+@keyframes float { 50% { transform: translateY(-14px); } }
+
+/* ---------- stats ---------- */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; margin: 10px 0 120px; }
+.stat { background: rgba(8,14,26,.85); padding: 30px 24px; text-align: center; }
+.stat .n { font: 700 clamp(30px, 4vw, 44px) "Space Grotesk", sans-serif; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stat .l { color: var(--text-2); font-size: 14px; }
+
+/* ---------- sections ---------- */
+section { margin-bottom: 140px; }
+.kicker { color: var(--lime); font-size: 13px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; }
+h2 { font-size: clamp(32px, 4.6vw, 54px); line-height: 1.05; margin: 12px 0 18px; }
+.sub { color: var(--text-2); font-size: 18px; max-width: 620px; margin: 0 0 50px; }
+.center { text-align: center; }
+.center .sub { margin-left: auto; margin-right: auto; }
+
+/* mock app window */
+.window {
+  border-radius: 18px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, #111a2c, #0b1220);
+  box-shadow: 0 50px 120px -30px rgba(0,120,255,.35), 0 0 0 1px rgba(255,255,255,.03) inset; overflow: hidden;
+  transform: perspective(1400px) rotateX(14deg) scale(.94); transition: transform 1.2s cubic-bezier(.2,.8,.2,1);
+}
+.window.in { transform: perspective(1400px) rotateX(0) scale(1); }
+.wbar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: linear-gradient(90deg, #00339A, #006F82 60%, #00A16F); }
+.wbar i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,.35); }
+.wbar span { margin-left: 10px; font: 700 14px "Space Grotesk"; }
+.wbar em { margin-left: auto; font-style: normal; font-size: 12px; background: rgba(255,255,255,.18); padding: 3px 10px; border-radius: 999px; }
+.wbody { display: grid; grid-template-columns: 200px 1fr; min-height: 420px; }
+.wside { border-right: 1px solid var(--line); padding: 16px 12px; display: grid; gap: 10px; align-content: start; }
+.wdrive { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+.wdrive.on { border-color: #3b7dff; box-shadow: 0 0 0 1px #3b7dff inset; }
+.wdrive .b { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 6px; overflow: hidden; }
+.wdrive .b i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, #00a5a0, #2f6bff); transition: width 1.6s cubic-bezier(.2,.8,.2,1); }
+.wdrive.hot .b i { background: linear-gradient(90deg, #ec835a, #d03b3b); }
+.wmain { padding: 18px; display: grid; gap: 16px; align-content: start; min-width: 0; }
+.wcards { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: center; background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.wleg { display: grid; gap: 6px; font-size: 13px; }
+.wleg div { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; }
+.wleg i { width: 12px; height: 12px; border-radius: 3px; }
+.wleg b { font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.wrows { display: grid; gap: 2px; font-size: 13px; }
+.wrow { display: grid; grid-template-columns: 1fr 80px 1.1fr 110px; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.02); opacity: 0; transform: translateX(-12px); transition: all .6s; }
+.window.in .wrow { opacity: 1; transform: none; }
+.wrow .bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden; }
+.wrow .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #00a5a0, #2f6bff); border-radius: 4px; transition: width 1.4s cubic-bezier(.2,.8,.2,1); }
+.wrow .r { text-align: right; font-variant-numeric: tabular-nums; }
+.pill { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 8px; justify-self: start; }
+.pill.safe { background: rgba(47,229,138,.14); color: #6fe0a5; }
+.pill.rev { background: rgba(250,178,25,.14); color: #f5c95a; }
+.mdonut circle { fill: none; stroke-width: 22; transition: stroke-dasharray 1.6s cubic-bezier(.2,.8,.2,1); }
+
+/* feature cards */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.feat {
+  position: relative; padding: 28px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); overflow: hidden;
+  transition: transform .3s, border-color .3s; transform-style: preserve-3d;
+}
+.feat::before {
+  content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity .3s; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(47,229,138,.14), transparent 45%);
+}
+.feat:hover { border-color: rgba(125,255,179,.3); }
+.feat:hover::before { opacity: 1; }
+.feat .ic { width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: linear-gradient(135deg, rgba(47,107,255,.25), rgba(47,229,138,.2)); border: 1px solid var(--line); margin-bottom: 18px; }
+.feat h3 { margin: 0 0 8px; font-size: 20px; }
+.feat p { margin: 0; color: var(--text-2); font-size: 15px; }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; position: relative; }
+.step { padding: 30px; border-radius: 20px; border: 1px solid var(--line); background: rgba(8,14,26,.7); position: relative; }
+.step::before { counter-increment: s; content: "0" counter(s); font: 700 64px "Space Grotesk"; position: absolute; right: 20px; top: 6px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; opacity: .35; }
+.step h3 { margin: 0 0 8px; font-size: 20px; }
+.step p { margin: 0; color: var(--text-2); font-size: 15px; }
+code { font: 13px ui-monospace, "Cascadia Code", Consolas, monospace; background: rgba(255,255,255,.07); padding: 2px 7px; border-radius: 6px; color: var(--lime); }
+
+/* safety */
+.safety { display: grid; grid-template-columns: .9fr 1.1fr; gap: 50px; align-items: center; }
+.shield { position: relative; aspect-ratio: 1; max-width: 380px; width: 100%; margin: 0 auto; display: grid; place-items: center; }
+.shield .ring2 { position: absolute; inset: 0; border-radius: 50%; border: 1px solid rgba(125,255,179,.25); animation: ripple 3.6s ease-out infinite; }
+.shield .ring2:nth-child(2) { animation-delay: -1.2s; } .shield .ring2:nth-child(3) { animation-delay: -2.4s; }
+@keyframes ripple { 0% { transform: scale(.35); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+.shield svg { width: 46%; filter: drop-shadow(0 0 30px rgba(47,229,138,.6)); animation: float 5s ease-in-out infinite; }
+.checks { display: grid; gap: 14px; }
+.check { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.check .tk { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: rgba(47,229,138,.15); color: var(--green); font-weight: 700; font-size: 14px; }
+.check b { display: block; margin-bottom: 2px; }
+.check span { color: var(--text-2); font-size: 15px; }
+
+/* final cta */
+.final { text-align: center; padding: 90px 24px; border-radius: 32px; border: 1px solid var(--line); position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 0%, rgba(47,107,255,.25), transparent 60%), radial-gradient(ellipse at 50% 120%, rgba(47,229,138,.25), transparent 60%), rgba(8,14,26,.8); }
+.final::before { content: ""; position: absolute; inset: -50%; background: conic-gradient(from 0deg, transparent 0 70%, rgba(47,229,138,.35) 80%, transparent 90%); animation: spin 8s linear infinite; z-index: -1; }
+.final::after { content: ""; position: absolute; inset: 1px; border-radius: 31px; background: var(--bg-2); z-index: -1; opacity: .85; }
+.final { isolation: isolate; }
+.final h2 { margin-top: 0; }
+.final .ctas { justify-content: center; }
+
+footer { border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.coffee { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 999px; text-decoration: none; font-weight: 600; color: #1b1203; background: linear-gradient(100deg, #ffd36b, #ffb347); box-shadow: 0 8px 30px -8px rgba(255,190,80,.6); transition: transform .2s; }
+.coffee:hover { transform: translateY(-2px) rotate(-1deg); }
+.coffee .cup { display: inline-block; animation: steam 2s ease-in-out infinite; }
+@keyframes steam { 50% { transform: rotate(-12deg) translateY(-2px); } }
+.made b { color: var(--text); }
+
+/* scroll reveal */
+.rv { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.2,.8,.2,1), transform .9s cubic-bezier(.2,.8,.2,1); }
+.rv.in { opacity: 1; transform: none; }
+.rv.d1 { transition-delay: .1s; } .rv.d2 { transition-delay: .2s; } .rv.d3 { transition-delay: .3s; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); min-height: auto; padding-top: 30px; text-align: left; }
+  .orb { width: min(420px, 100%); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero > *, .safety > * { min-width: 0; }
+  .typed { white-space: normal; }
+  .chip { font-size: 12px; }
+  .features, .steps { grid-template-columns: minmax(0, 1fr); }
+  .safety { grid-template-columns: minmax(0, 1fr); }
+  .wbody { grid-template-columns: 1fr; }
+  .wside { display: none; }
+  .wcards { grid-template-columns: 1fr; justify-items: center; }
+  .wleg { width: 100%; }
+  .wrow { grid-template-columns: 1fr 70px 80px; }
+  .wrow .pill { display: none; }
+  nav .links .hide-sm { display: none; }
+  section { margin-bottom: 100px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .rv { opacity: 1; transform: none; }
+  .seg { stroke-dasharray: var(--len) 1000; }
+}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="aurora"><i></i><i></i><i></i></div>
+<div class="grid-floor"></div>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="6"/><path d="M16 5a11 11 0 0 1 11 11" fill="none" stroke="url(#lg)" stroke-width="6" stroke-linecap="round"/><defs><linearGradient id="lg"><stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2fe58a"/></linearGradient></defs></svg>
+      DriveSize
+    </a>
+    <div class="links">
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="#how" class="hide-sm">How it works</a>
+      <a href="#safety" class="hide-sm">Safety</a>
+      <a class="ghbtn" href="https://github.com/jestie/DriveSize">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+  <div class="wrap">
+    <!-- HERO -->
+    <div class="hero">
+      <div>
+        <span class="eyebrow rv"><span class="dot"></span>Free &amp; open source · v1.0</span>
+        <h1 class="rv d1">Where did all<br>your <span class="shine">space go?</span></h1>
+        <p class="lede rv d2">DriveSize maps every drive in seconds, shows you exactly what's eating it in gorgeous donut charts, and finds the <span class="typed" id="typed">temp junk</span> you can safely bin.</p>
+        <div class="ctas rv d3">
+          <a class="btn primary" href="https://github.com/jestie/DriveSize">
+            Get DriveSize on GitHub <span class="arrow">→</span>
+          </a>
+          <a class="btn ghost" href="https://github.com/jestie/DriveSize/archive/refs/heads/main.zip">⬇ Download ZIP</a>
+        </div>
+        <div class="ticks rv d3"><span>No install</span><span>Just Python</span><span>Windows &amp; Linux</span><span>Runs 100% locally</span></div>
+      </div>
+
+      <div class="orb rv d2" id="orb">
+        <svg viewBox="0 0 500 500" aria-hidden="true">
+          <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <radialGradient id="coreg"><stop offset="0" stop-color="#0c2a5c"/><stop offset="1" stop-color="#050912" stop-opacity="0"/></radialGradient>
+            <linearGradient id="sweepg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2fe58a" stop-opacity="0"/><stop offset="1" stop-color="#2fe58a" stop-opacity=".45"/></linearGradient>
+          </defs>
+          <circle cx="250" cy="250" r="230" fill="url(#coreg)"/>
+          <g class="ring r3" id="ringOuter"></g>
+          <g class="ring r1" id="ringMain"></g>
+          <g class="ring r2" id="ringInner"></g>
+          <g class="sweep"><path d="M250 250 L250 95 A155 155 0 0 1 384 172 Z" fill="url(#sweepg)" opacity=".5"/></g>
+          <circle cx="250" cy="250" r="98" fill="#060c18" stroke="rgba(255,255,255,.08)"/>
+          <text class="core" x="250" y="258" text-anchor="middle" id="coreNum">0 GB</text>
+          <text class="core-sub" x="250" y="288" text-anchor="middle">RECLAIMABLE</text>
+        </svg>
+        <div class="chip" style="left:-4%;top:12%"><span class="sw" style="background:#3987e5"></span><b>Video</b><small>235 GB</small></div>
+        <div class="chip" style="right:-6%;top:24%;animation-delay:-2s"><span class="sw" style="background:#2fe58a"></span><b>Temp &amp; cache</b><small>✓ safe</small></div>
+        <div class="chip" style="left:2%;bottom:14%;animation-delay:-4s"><span class="sw" style="background:#9085e9"></span><b>Disk images</b><small>170 GB</small></div>
+        <div class="chip" style="right:0;bottom:6%;animation-delay:-1s"><span class="sw" style="background:#f5c95a"></span><b>Duplicates</b><small>12 found</small></div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats rv">
+      <div class="stat"><div class="n" data-count="2.1" data-dec="1" data-suf="M">0</div><div class="l">files mapped on one drive</div></div>
+      <div class="stat"><div class="n" data-count="43" data-suf="s">0</div><div class="l">to scan a full 1.8&nbsp;TB disk</div></div>
+      <div class="stat"><div class="n" data-count="300" data-suf=" GB">0</div><div class="l">of temp junk found on first run</div></div>
+      <div class="stat"><div class="n" data-count="0" data-suf=" installs">0</div><div class="l">just the Python standard library</div></div>
+    </div>
+
+    <!-- MOCK APP -->
+    <section class="center">
+      <div class="kicker rv">See it</div>
+      <h2 class="rv">Your disk, <span class="shine">at a glance</span></h2>
+      <p class="sub rv">Click a slice, drill into a folder, tick what you don't need, done. Browsing works while the scan is still running.</p>
+      <div class="window rv" id="win">
+        <div class="wbar"><i></i><i></i><i></i><span>DriveSize</span><em>C:\ · 1.78 TB · 2,108,643 files</em></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="wdrive on hot">C:\ <span style="float:right;color:#ec835a">95%</span><div class="b"><i data-w="95"></i></div></div>
+            <div class="wdrive">D:\ Ephe <span style="float:right">75%</span><div class="b"><i data-w="75"></i></div></div>
+            <div class="wdrive">E:\ Big <span style="float:right">88%</span><div class="b"><i data-w="88"></i></div></div>
+            <div class="wdrive">G:\ Fast <span style="float:right">89%</span><div class="b"><i data-w="89"></i></div></div>
+            <div class="wdrive">H:\ <span style="float:right">51%</span><div class="b"><i data-w="51"></i></div></div>
+          </div>
+          <div class="wmain">
+            <div class="wcards">
+              <svg class="mdonut" width="170" height="170" viewBox="0 0 170 170" id="mdonut"></svg>
+              <div class="wleg" id="mleg"></div>
+            </div>
+            <div class="wrows" id="mrows"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features">
+      <div class="kicker rv">Features</div>
+      <h2 class="rv">Everything TreeSize does.<br><span class="shine">Prettier.</span></h2>
+      <p class="sub rv">A proper disk utility in a single folder. Double-click and it opens in your browser.</p>
+      <div class="features">
+        <div class="feat rv"><div class="ic">🍩</div><h3>Donut charts everywhere</h3><p>Every drive and folder broken down by subfolder and file type. Hover for detail, click a slice to dive in.</p></div>
+        <div class="feat rv d1"><div class="ic">⚡</div><h3>Seriously fast</h3><p>Multi-threaded native scanning: millions of files in under a minute, with live progress as it goes.</p></div>
+        <div class="feat rv d2"><div class="ic">🧹</div><h3>Smart cleanup</h3><p>Flags temp folders, caches, old installers, logs and forgotten venvs as <b>Safe</b> or <b>Review</b>, with the reason why.</p></div>
+        <div class="feat rv"><div class="ic">📂</div><h3>Browse like Explorer</h3><p>Breadcrumbs, sortable columns, size bars, filters, and a jump straight to the folder in Windows Explorer.</p></div>
+        <div class="feat rv d1"><div class="ic">👯</div><h3>Duplicate finder</h3><p>Spots big files that exist twice, so you can keep one and reclaim the rest.</p></div>
+        <div class="feat rv d2"><div class="ic">🏆</div><h3>Largest files</h3><p>The top 1,000 space hogs on the drive, one click from deletion. Plus a breakdown by extension.</p></div>
+      </div>
+    </section>
+
+    <!-- HOW -->
+    <section id="how">
+      <div class="kicker rv">How it works</div>
+      <h2 class="rv">Three steps. <span class="shine">Zero setup.</span></h2>
+      <p class="sub rv">All you need is Python 3, which you probably already have.</p>
+      <div class="steps">
+        <div class="step rv"><h3>Grab it</h3><p>Download the ZIP or <code>git clone</code> the repo anywhere you like.</p></div>
+        <div class="step rv d1"><h3>Launch it</h3><p>Windows: double-click <code>DriveSize.bat</code>. Linux/WSL: run <code>./drivesize.sh</code>.</p></div>
+        <div class="step rv d2"><h3>Clean up</h3><p>Pick a drive, watch it map, tick the junk and send it to the Recycle Bin.</p></div>
+      </div>
+    </section>
+
+    <!-- SAFETY -->
+    <section id="safety" class="safety">
+      <div class="shield rv">
+        <span class="ring2"></span><span class="ring2"></span><span class="ring2"></span>
+        <svg viewBox="0 0 64 64"><defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2fe58a"/></linearGradient></defs><path d="M32 4 8 13v17c0 15 10 26 24 30 14-4 24-15 24-30V13z" fill="url(#sg)"/><path d="m21 32 8 8 15-16" fill="none" stroke="#04140b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="kicker rv">Safety first</div>
+        <h2 class="rv">Deleting, <span class="shine">without the fear.</span></h2>
+        <div class="checks">
+          <div class="check rv"><span class="tk">✓</span><div><b>Recycle Bin by default</b><span>Changed your mind? Restore it. Permanent delete is opt-in.</span></div></div>
+          <div class="check rv d1"><span class="tk">✓</span><div><b>System areas are locked</b><span>Windows, Program Files, drive roots and page files are refused, every time.</span></div></div>
+          <div class="check rv d2"><span class="tk">✓</span><div><b>Never leaves your machine</b><span>Runs on 127.0.0.1 with a per-session token. No cloud, no telemetry, no accounts.</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="final rv">
+      <div class="kicker">Ready?</div>
+      <h2>Take back your <span class="shine">disk space.</span></h2>
+      <p class="sub">Free forever. Open source. Takes ten seconds to start.</p>
+      <div class="ctas">
+        <a class="btn primary" href="https://github.com/jestie/DriveSize">Get DriveSize on GitHub <span class="arrow">→</span></a>
+        <a class="btn ghost" href="https://github.com/jestie/DriveSize/archive/refs/heads/main.zip">⬇ Download ZIP</a>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="made">Created by <b>Jestie</b> · DriveSize</div>
+    <a class="coffee" href="https://paypal.me/jestie129" target="_blank" rel="noopener noreferrer"><span class="cup">☕</span> Buy me a coffee</a>
+  </div>
+</footer>
+
+<script>
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* starfield */
+(() => {
+  const c = document.getElementById("stars"), x = c.getContext("2d");
+  let w, h, stars = [];
+  const size = () => {
+    w = c.width = innerWidth * devicePixelRatio; h = c.height = innerHeight * devicePixelRatio;
+    c.style.width = innerWidth + "px"; c.style.height = innerHeight + "px";
+    stars = Array.from({length: Math.min(220, innerWidth / 6)}, () => ({x: Math.random() * w, y: Math.random() * h, z: Math.random() * .8 + .2, t: Math.random() * 6}));
+  };
+  size(); addEventListener("resize", size);
+  let my = 0; addEventListener("scroll", () => my = scrollY);
+  const tick = time => {
+    x.clearRect(0, 0, w, h);
+    for (const s of stars) {
+      const y = (s.y - my * s.z * .3 * devicePixelRatio) % h, yy = y < 0 ? y + h : y;
+      const a = .35 + .45 * Math.sin(time / 900 + s.t);
+      x.fillStyle = `rgba(${s.z > .7 ? "180,255,210" : "170,200,255"},${a * s.z})`;
+      x.beginPath(); x.arc(s.x, yy, s.z * 1.5 * devicePixelRatio, 0, 7); x.fill();
+    }
+    if (!reduce) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+})();
+
+/* reactor rings */
+const NS = "http://www.w3.org/2000/svg";
+function ring(id, r, width, segs, gap, delay) {
+  const g = document.getElementById(id), C = 2 * Math.PI * r;
+  let off = 0;
+  segs.forEach(([frac, color], i) => {
+    const len = Math.max(0, C * frac - gap);
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", 250); c.setAttribute("cy", 250); c.setAttribute("r", r);
+    c.setAttribute("stroke", color); c.setAttribute("stroke-width", width); c.setAttribute("class", "seg");
+    c.setAttribute("transform", `rotate(${off * 360 - 90} 250 250)`);
+    c.style.setProperty("--len", len);
+    c.style.animationDelay = (delay + i * .12) + "s";
+    g.appendChild(c); off += frac;
+  });
+}
+ring("ringMain", 150, 26, [[.35, "#3987e5"], [.26, "#9085e9"], [.16, "#2fe58a"], [.09, "#f5c95a"], [.08, "#e87ba4"], [.06, "#18c6c0"]], 8, .2);
+ring("ringInner", 118, 6, [[.5, "#2fe58a"], [.2, "#4f8bff"], [.3, "#18c6c0"]], 14, .6);
+ring("ringOuter", 196, 3, Array.from({length: 24}, (_, i) => [1 / 24, i % 3 ? "rgba(120,170,255,.35)" : "#7dffb3"]), 10, 1);
+
+/* counting */
+function countUp(el, to, dec, suf, ms = 1800) {
+  const t0 = performance.now();
+  const step = t => {
+    const p = Math.max(0, Math.min(1, (t - t0) / ms)), e = 1 - Math.pow(1 - p, 4);
+    el.textContent = (to * e).toFixed(dec) + suf;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  reduce ? el.textContent = to.toFixed(dec) + suf : requestAnimationFrame(step);
+}
+setTimeout(() => {
+  const el = document.getElementById("coreNum"), t0 = performance.now();
+  const step = t => { const p = Math.max(0, Math.min(1, (t - t0) / 2200)), e = 1 - Math.pow(1 - p, 4);
+    el.textContent = Math.round(403 * e) + " GB"; if (p < 1) requestAnimationFrame(step); };
+  reduce ? el.textContent = "403 GB" : requestAnimationFrame(step);
+}, 500);
+
+/* typewriter */
+(() => {
+  const words = ["temp junk", "forgotten caches", "old installers", "duplicate videos", "300 GB of Temp"];
+  const el = document.getElementById("typed");
+  if (reduce) return;
+  let wi = 0, ci = words[0].length, del = true;
+  setTimeout(function loop() {
+    const w = words[wi];
+    if (del) { ci--; if (ci === 0) { del = false; wi = (wi + 1) % words.length; } }
+    else { ci++; if (ci === words[wi].length) { del = true; el.textContent = words[wi]; return setTimeout(loop, 2200); } }
+    el.textContent = words[wi].slice(0, ci) || "\u200b";
+    setTimeout(loop, del ? 40 : 75);
+  }, 2600);
+})();
+
+/* mock app */
+const MOCK = [["Users", 1.1, "#3987e5"], ["AI", .21, "#9085e9"], ["Program Files", .034, "#2fe58a"], ["Windows", .03, "#f5c95a"], ["ProgramData", .02, "#e87ba4"], ["Other", .39, "#5a616d"]];
+const ROWS = [["AppData\\Local\\Temp", "300 GB", 45, "safe", "✓ Safe to delete"], ["NVIDIA\\DXCache", "59.3 GB", 9, "safe", "✓ Safe to delete"], ["Videos\\Old recordings", "9.3 GB", 2, "rev", "? Review"], ["Downloads", "5.5 GB", 1.2, "rev", "? Review"], ["pip\\cache", "4.1 GB", 1, "safe", "✓ Safe to delete"]];
+(() => {
+  const svg = document.getElementById("mdonut"), leg = document.getElementById("mleg"), rows = document.getElementById("mrows");
+  const r = 60, C = 2 * Math.PI * r, tot = MOCK.reduce((a, m) => a + m[1], 0);
+  let off = 0;
+  const arcs = MOCK.map(([name, v, col]) => {
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", 85); c.setAttribute("cy", 85); c.setAttribute("r", r); c.setAttribute("stroke", col);
+    c.setAttribute("transform", `rotate(${off / tot * 360 - 90} 85 85)`);
+    c.setAttribute("stroke-dasharray", `0 ${C}`);
+    svg.appendChild(c);
+    const len = v / tot * C - 3; off += v;
+    leg.insertAdjacentHTML("beforeend", `<div><i style="background:${col}"></i><span>${name}</span><b>${v >= 1 ? v.toFixed(2) + " TB" : Math.round(v * 1000) + " GB"}</b></div>`);
+    return [c, len];
+  });
+  svg.insertAdjacentHTML("beforeend", `<text x="85" y="88" text-anchor="middle" fill="#fff" font-family="Space Grotesk" font-weight="700" font-size="20">1.78 TB</text><text x="85" y="106" text-anchor="middle" fill="#a9b5c9" font-size="10">on C:\\</text>`);
+  ROWS.forEach(([n, s, p, cls, lbl], i) => rows.insertAdjacentHTML("beforeend",
+    `<div class="wrow" style="transition-delay:${.5 + i * .1}s"><span>📁 ${n}</span><span class="r">${s}</span><div class="bar"><i data-w="${p * 2}"></i></div><span class="pill ${cls}">${lbl}</span></div>`));
+  window.__mockIn = () => {
+    arcs.forEach(([c, len], i) => setTimeout(() => c.setAttribute("stroke-dasharray", `${Math.max(0, len)} ${C}`), 300 + i * 120));
+    document.querySelectorAll("#win [data-w]").forEach(i => setTimeout(() => i.style.width = Math.min(100, i.dataset.w) + "%", 400));
+  };
+})();
+
+/* scroll reveal */
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (!e.isIntersecting) return;
+  e.target.classList.add("in"); io.unobserve(e.target);
+  if (e.target.id === "win") window.__mockIn();
+  if (e.target.classList.contains("stats")) e.target.querySelectorAll("[data-count]").forEach(n => countUp(n, +n.dataset.count, +(n.dataset.dec || 0), n.dataset.suf));
+}), {threshold: .18});
+document.querySelectorAll(".rv").forEach(el => io.observe(el));
+
+/* card spotlight + tilt */
+document.querySelectorAll(".feat").forEach(card => {
+  card.addEventListener("mousemove", e => {
+    const b = card.getBoundingClientRect(), px = (e.clientX - b.left) / b.width, py = (e.clientY - b.top) / b.height;
+    card.style.setProperty("--mx", px * 100 + "%"); card.style.setProperty("--my", py * 100 + "%");
+    if (!reduce) card.style.transform = `perspective(700px) rotateY(${(px - .5) * 8}deg) rotateX(${(.5 - py) * 8}deg) translateY(-4px)`;
+  });
+  card.addEventListener("mouseleave", () => card.style.transform = "");
+});
+
+/* orb parallax */
+const orb = document.getElementById("orb");
+addEventListener("mousemove", e => {
+  if (reduce || innerWidth < 900) return;
+  const dx = e.clientX / innerWidth - .5, dy = e.clientY / innerHeight - .5;
+  orb.style.transform = `perspective(900px) rotateY(${dx * 14}deg) rotateX(${-dy * 14}deg)`;
+});
+</script>
+</body>
+</html>
