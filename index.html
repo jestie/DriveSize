@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DriveSize</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%2300837B' stroke-width='6'/%3E%3Cpath d='M16 5a11 11 0 0 1 11 11' fill='none' stroke='%2300339A' stroke-width='6'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #f7f8fa; --border: #e2e6ec;
+  --text: #0e1726; --text-2: #4a5568; --muted: #7b8698;
+  --brand: #00339A; --brand-2: #006F82; --accent: #00A16F; --accent-2: #00BF63;
+  --brand-soft: #e6ecf8; --hover: #eef2f8;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --other: #b9bec7; --free: #e4e8ee;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --safe-bg: #e3f6ec; --safe-fg: #0a6b3c; --review-bg: #fff3d6; --review-fg: #845b00;
+  --sys-bg: #fde6e6; --sys-fg: #a12a2a;
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1218; --surface: #181c24; --surface-2: #1e232d; --border: #2b313d;
+    --text: #eef1f6; --text-2: #b7bfcc; --muted: #8590a2;
+    --brand: #5b8cf0; --brand-2: #2bb3c4; --accent: #20c58b; --accent-2: #2fdc7f;
+    --brand-soft: #1d2a45; --hover: #232a36;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #5a616d; --free: #2c323d;
+    --safe-bg: #123526; --safe-fg: #6fe0a5; --review-bg: #3a2f10; --review-fg: #f5c95a;
+    --sys-bg: #3d1a1a; --sys-fg: #f29b9b;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1218; --surface: #181c24; --surface-2: #1e232d; --border: #2b313d;
+  --text: #eef1f6; --text-2: #b7bfcc; --muted: #8590a2;
+  --brand: #5b8cf0; --brand-2: #2bb3c4; --accent: #20c58b; --accent-2: #2fdc7f;
+  --brand-soft: #1d2a45; --hover: #232a36;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #5a616d; --free: #2c323d;
+  --safe-bg: #123526; --safe-fg: #6fe0a5; --review-bg: #3a2f10; --review-fg: #f5c95a;
+  --sys-bg: #3d1a1a; --sys-fg: #f29b9b;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+}
+button { font: inherit; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* top bar */
+header {
+  display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+  background: linear-gradient(90deg, #00339A, #006F82 60%, #00A16F); color: #fff;
+}
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: .2px; cursor: pointer; }
+.logo svg { width: 26px; height: 26px; }
+.scanbar { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 13px; }
+.scanbar .path { opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; min-width: 0; }
+.pill { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.spin { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hbtn { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.3); border-radius: 8px; padding: 5px 12px; }
+.hbtn:hover { background: rgba(255,255,255,.24); }
+
+/* layout */
+.app { display: grid; grid-template-columns: 290px 1fr; min-height: 0; }
+aside { border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; padding: 16px 14px; }
+main { overflow-y: auto; padding: 18px 24px 90px; min-width: 0; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.drive {
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  cursor: pointer; background: var(--surface); transition: border-color .15s, background .15s;
+}
+.drive:hover { border-color: var(--brand-2); background: var(--hover); }
+.drive.active { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.drive .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.drive .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drive .meta { font-size: 12px; color: var(--muted); }
+.bar { height: 8px; border-radius: 4px; background: var(--free); overflow: hidden; margin: 7px 0 4px; }
+.bar > i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--brand-2), var(--brand)); }
+.bar.warn > i { background: linear-gradient(90deg, var(--serious), var(--critical)); }
+.folderbox { margin-top: 18px; }
+.folderbox input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font: inherit; }
+.btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  border-radius: 8px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.danger { background: var(--critical); color: #fff; border-color: var(--critical); }
+.btn.small { padding: 3px 9px; font-size: 12px; }
+.note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; overflow-x: auto; }
+.tab { background: none; border: 0; padding: 9px 14px; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab.on { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+.tab .count { font-size: 11px; background: var(--brand-soft); color: var(--brand); border-radius: 999px; padding: 1px 7px; margin-left: 4px; }
+
+/* cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; margin-bottom: 18px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+.card h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.card h3 span { color: var(--muted); font-weight: 400; }
+.donutwrap { display: flex; gap: 16px; align-items: center; }
+.donutwrap svg { flex: none; overflow: visible; }
+.donutwrap path { cursor: pointer; transition: opacity .15s; }
+.donutwrap.hovering path:not(.hl) { opacity: .35; }
+.legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 0; font-size: 13px; }
+.legend li { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 8px; align-items: center; padding: 3px 6px; border-radius: 6px; cursor: default; }
+.legend li.click { cursor: pointer; }
+.legend li:hover, .legend li.hl { background: var(--hover); }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+.legend .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legend .v { color: var(--text-2); }
+.legend .p { color: var(--muted); font-size: 12px; min-width: 40px; text-align: right; }
+.ctext1 { font-size: 17px; font-weight: 700; fill: var(--text); }
+.ctext2 { font-size: 11px; fill: var(--muted); }
+
+/* stats */
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; min-width: 120px; }
+.stat b { display: block; font-size: 20px; }
+.stat small { color: var(--muted); font-size: 12px; }
+
+/* crumbs */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 14px; font-size: 14px; }
+.crumbs a { color: var(--brand); cursor: pointer; padding: 2px 6px; border-radius: 6px; text-decoration: none; }
+.crumbs a:hover { background: var(--brand-soft); }
+.crumbs .sep { color: var(--muted); }
+.crumbs a:last-child { color: var(--text); font-weight: 600; }
+
+/* tables */
+.tablecard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.tools input[type=search], .tools select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font: inherit; }
+.tools .grow { flex: 1; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--text-2); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--surface-2); white-space: nowrap; user-select: none; }
+th.sort { cursor: pointer; }
+th.sort:hover { color: var(--text); }
+td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: var(--hover); }
+tr.sel { background: var(--brand-soft) !important; }
+td.r, th.r { text-align: right; white-space: nowrap; }
+td.num { white-space: nowrap; }
+td.name { max-width: 0; width: 45%; }
+.nm { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nm span.t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm a { color: var(--text); cursor: pointer; text-decoration: none; font-weight: 500; }
+.nm a:hover { color: var(--brand); text-decoration: underline; }
+.ico { flex: none; width: 18px; height: 18px; }
+.sizebar { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+.sizebar .bar { flex: 1; margin: 0; height: 7px; }
+.sizebar .pct { width: 42px; text-align: right; color: var(--muted); font-size: 12px; }
+.path { color: var(--muted); font-size: 12px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.badge.safe { background: var(--safe-bg); color: var(--safe-fg); }
+.badge.review { background: var(--review-bg); color: var(--review-fg); }
+.badge.system { background: var(--sys-bg); color: var(--sys-fg); }
+.reason { color: var(--text-2); font-size: 12px; }
+input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--brand); cursor: pointer; }
+.iconbtn { background: none; border: 0; color: var(--muted); padding: 2px 4px; border-radius: 6px; }
+.iconbtn:hover { color: var(--brand); background: var(--brand-soft); }
+.more { padding: 10px 14px; color: var(--muted); font-size: 12px; }
+.dupe { border-top: 6px solid var(--bg); }
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+
+/* home */
+.hero { margin-bottom: 18px; }
+.hero h1 { margin: 0 0 4px; font-size: 22px; }
+.hero p { margin: 0; color: var(--text-2); }
+.drivecard .donutwrap { justify-content: flex-start; }
+.drivecard .act { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
+
+/* action bar + modal */
+.actionbar {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(140%);
+  background: var(--text); color: var(--bg); border-radius: 14px; padding: 10px 12px 10px 18px;
+  display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  transition: transform .2s; z-index: 20; max-width: calc(100vw - 32px);
+}
+.actionbar.show { transform: translateX(-50%) translateY(0); }
+.actionbar .btn { border-color: transparent; }
+.actionbar .ghost { background: transparent; color: var(--bg); border: 1px solid rgba(127,127,127,.5); }
+.modalbg { position: fixed; inset: 0; background: rgba(5,10,20,.55); display: none; align-items: center; justify-content: center; z-index: 30; padding: 16px; }
+.modalbg.show { display: flex; }
+.modal { background: var(--surface); border-radius: 16px; width: min(640px, 100%); max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+.modal header { background: none; color: var(--text); padding: 18px 20px 8px; font-size: 17px; font-weight: 700; }
+.modal .body { padding: 0 20px; overflow-y: auto; }
+.modal ul { padding: 0; list-style: none; margin: 10px 0; font-size: 12px; }
+.modal li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.modal li span:first-child { overflow-wrap: anywhere; }
+.modal .foot { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--border); align-items: center; }
+.modal .warnbox { background: var(--review-bg); color: var(--review-fg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.modal label { display: flex; gap: 8px; align-items: center; margin: 12px 0; font-size: 13px; }
+.toast { position: fixed; top: 64px; right: 20px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; box-shadow: var(--shadow); z-index: 40; max-width: 380px; font-size: 13px; display: none; }
+.toast.err { border-left-color: var(--critical); }
+#tip { position: fixed; pointer-events: none; background: var(--text); color: var(--bg); padding: 6px 10px; border-radius: 8px; font-size: 12px; z-index: 50; display: none; max-width: 320px; }
+#tip b { display: block; }
+
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  .app { grid-template-columns: 1fr; }
+  aside { border-right: 0; border-bottom: 1px solid var(--border); }
+  main { padding: 16px 16px 90px; overflow: visible; }
+  .cards { grid-template-columns: 1fr; }
+  .donutwrap { flex-direction: column; align-items: stretch; }
+  .donutwrap svg { align-self: center; }
+  .scanbar .path { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" id="logo" title="All drives">
+    <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="6"/><path d="M16 5a11 11 0 0 1 11 11" fill="none" stroke="#fff" stroke-width="6"/></svg>
+    DriveSize
+  </div>
+  <div class="scanbar" id="scanbar"></div>
+  <button class="hbtn" id="theme" title="Toggle light/dark">◐</button>
+</header>
+<div class="app">
+  <aside>
+    <h2>Drives</h2>
+    <div id="drives"></div>
+    <div class="folderbox">
+      <h2>Scan a folder</h2>
+      <form id="folderform" style="display:flex;gap:6px">
+        <input id="folderinput" placeholder="e.g. C:\Users\you\Downloads" autocomplete="off">
+        <button class="btn primary" type="submit">Scan</button>
+      </form>
+      <div class="note" id="modenote"></div>
+    </div>
+  </aside>
+  <main id="main"></main>
+</div>
+<div class="actionbar" id="actionbar">
+  <span id="selinfo" class="num"></span>
+  <button class="btn ghost small" id="selclear">Clear</button>
+  <button class="btn danger" id="seldelete">Delete…</button>
+</div>
+<div class="modalbg" id="modalbg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<div id="tip"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"].map(v => `var(${v})`);
+// File categories keep the same color everywhere (color follows the entity).
+const CAT_COLOR = {"Video":SERIES[0],"Images":SERIES[1],"Audio":SERIES[2],"Documents":SERIES[3],
+  "Archives":SERIES[4],"Programs":SERIES[5],"Disk images":SERIES[6],"Temp & logs":SERIES[7]};
+// Categories without their own color fold into one "Other" slice.
+function catSegs(cats) {
+  const segs = cats.filter(c => CAT_COLOR[c.name]).map(c => ({label: c.name, value: c.size, color: CAT_COLOR[c.name]}));
+  const rest = cats.filter(c => !CAT_COLOR[c.name]).reduce((a, c) => a + c.size, 0);
+  segs.sort((a, b) => b.value - a.value);
+  if (rest > 0) segs.push({label: "Other (code, data, misc)", value: rest, color: OTHER});
+  return segs;
+}
+const OTHER = "var(--other)";
+
+function fmt(b) {
+  if (b == null) return "";
+  const u = ["B","KB","MB","GB","TB","PB"]; let i = 0; b = Math.max(0, b);
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return (i === 0 ? b : b.toFixed(b < 10 ? 2 : b < 100 ? 1 : 0)) + " " + u[i];
+}
+const fmtN = n => (n || 0).toLocaleString();
+const pct = (a, b) => b ? (100 * a / b) : 0;
+const fmtP = p => p >= 10 ? p.toFixed(0) + "%" : p >= 0.1 ? p.toFixed(1) + "%" : p > 0 ? "<0.1%" : "0%";
+const fmtD = t => t ? new Date(t * 1000).toLocaleDateString(undefined, {year:"numeric",month:"short",day:"numeric"}) : "";
+const fmtT = s => s < 60 ? Math.round(s) + "s" : Math.floor(s / 60) + "m " + Math.round(s % 60) + "s";
+
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:"POST", headers:{"X-Token":TOKEN,"Content-Type":"application/json"}, body:JSON.stringify(body)}
+                                   : {headers:{"X-Token":TOKEN}});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg, err) {
+  const t = $("#toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block";
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 5000);
+}
+
+/* ---------- state ---------- */
+const S = { drives: [], windows: false, scans: {}, root: null, nodeId: 0, tab: "explore",
+            sel: new Map(), sort: {key:"size", dir:-1}, filter: "", cleanLevel: "all", status: null };
+
+/* ---------- donut ---------- */
+const tip = $("#tip");
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = "block";
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); tip.style.left = x + "px"; tip.style.top = (e.clientY + 14) + "px"; }
+function hideTip() { tip.style.display = "none"; }
+
+// segs: [{label, value, color, onClick?}]
+function donut(segs, opts = {}) {
+  const size = opts.size || 180, r = size / 2, ir = r * (opts.inner || 0.62);
+  const total = segs.reduce((a, s) => a + s.value, 0) || 1;
+  const wrap = document.createElement("div"); wrap.className = "donutwrap";
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", size); svg.setAttribute("height", size); svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", opts.title || "donut chart");
+  let a0 = -Math.PI / 2;
+  const pt = (a, rad) => [r + rad * Math.cos(a), r + rad * Math.sin(a)];
+  const legend = document.createElement("ul"); legend.className = "legend";
+  const c1 = document.createElementNS(NS, "text"), c2 = document.createElementNS(NS, "text");
+  const center = (t1, t2) => { c1.textContent = t1; c2.textContent = t2; };
+  const reset = () => center(opts.centerTop ?? fmt(total), opts.centerSub ?? "");
+  const items = [];
+  segs.forEach((s, i) => {
+    if (s.value <= 0) return;
+    const frac = s.value / total;
+    let a1 = a0 + frac * Math.PI * 2;
+    if (frac >= 0.9999) a1 = a0 + Math.PI * 2 - 0.0001;
+    const large = (a1 - a0) > Math.PI ? 1 : 0;
+    const [x0, y0] = pt(a0, r), [x1, y1] = pt(a1, r), [x2, y2] = pt(a1, ir), [x3, y3] = pt(a0, ir);
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", `M${x0} ${y0}A${r} ${r} 0 ${large} 1 ${x1} ${y1}L${x2} ${y2}A${ir} ${ir} 0 ${large} 0 ${x3} ${y3}Z`);
+    p.setAttribute("fill", s.color);
+    p.setAttribute("stroke", "var(--surface)"); p.setAttribute("stroke-width", segs.length > 1 ? 2 : 0);
+    p.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(p);
+    const li = document.createElement("li");
+    if (s.onClick) li.classList.add("click");
+    li.innerHTML = `<span class="sw" style="background:${s.color}"></span><span class="lbl" title="${esc(s.label)}">${esc(s.label)}</span><span class="v num">${fmt(s.value)}</span><span class="p num">${fmtP(frac*100)}</span>`;
+    legend.appendChild(li);
+    const on = e => { wrap.classList.add("hovering"); p.classList.add("hl"); li.classList.add("hl");
+      center(fmtP(frac * 100), s.label.length > 18 ? s.label.slice(0, 17) + "…" : s.label);
+      if (e && e.clientX) showTip(e, `<b>${esc(s.label)}</b>${fmt(s.value)} · ${fmtP(frac*100)}${s.onClick ? "<br>Click to open" : ""}`); };
+    const off = () => { wrap.classList.remove("hovering"); p.classList.remove("hl"); li.classList.remove("hl"); reset(); hideTip(); };
+    for (const el of [p, li]) {
+      el.addEventListener("mousemove", on); el.addEventListener("mouseleave", off);
+      if (s.onClick) el.addEventListener("click", () => { hideTip(); s.onClick(); });
+    }
+    items.push(p);
+    a0 = a1;
+  });
+  for (const [t, cls, dy] of [[c1, "ctext1", -2], [c2, "ctext2", 15]]) {
+    t.setAttribute("x", r); t.setAttribute("y", r + dy); t.setAttribute("text-anchor", "middle"); t.setAttribute("class", cls + " num"); svg.appendChild(t);
+  }
+  reset();
+  wrap.appendChild(svg);
+  if (opts.legend !== false) wrap.appendChild(legend);
+  return wrap;
+}
+
+// Fold to at most 7 named + "Other" (8 categorical slots).
+function topN(list, n, colorOf) {
+  const sorted = list.filter(x => x.value > 0).sort((a, b) => b.value - a.value);
+  const head = sorted.slice(0, n), rest = sorted.slice(n);
+  const out = head.map((x, i) => ({...x, color: colorOf ? colorOf(x, i) : SERIES[i]}));
+  const rv = rest.reduce((a, x) => a + x.value, 0);
+  if (rv > 0) out.push({label: `Other (${rest.length})`, value: rv, color: OTHER});
+  return out;
+}
+
+/* ---------- icons ---------- */
+const ICON_DIR = `<svg class="ico" viewBox="0 0 24 24"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2h8.4A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" fill="#f4b740" stroke="#c98a12" stroke-width=".8"/></svg>`;
+const ICON_FILE = c => `<svg class="ico" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" fill="var(--surface-2)" stroke="var(--muted)" stroke-width="1.2"/><rect x="8" y="14" width="8" height="3" rx="1" fill="${CAT_COLOR[c] || OTHER}"/></svg>`;
+const ICON_REVEAL = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`;
+const badge = f => f ? `<span class="badge ${f[0]}" title="${esc(f[1])}">${{safe:"✓ Safe to delete",review:"? Review",system:"⛔ System"}[f[0]]}</span>` : "";
+
+/* ---------- drives sidebar ---------- */
+async function loadDrives() {
+  const j = await api("/api/drives");
+  S.drives = j.drives; S.windows = j.windows;
+  for (const s of j.scans) S.scans[s.key] = s;
+  renderDrives();
+  $("#modenote").innerHTML = j.windows
+    ? "Running on Windows: deletes go to the Recycle Bin by default."
+    : "Running on Linux/WSL: Windows drives under /mnt are slow to scan here. Use DriveSize.bat on Windows for those.";
+}
+const keyOf = p => S.windows ? p.toLowerCase() : p;
+function renderDrives() {
+  const el = $("#drives"); el.innerHTML = "";
+  for (const d of S.drives) {
+    const p = pct(d.used, d.total), k = keyOf(d.path), sc = S.scans[k];
+    const div = document.createElement("div");
+    div.className = "drive" + (S.root === k ? " active" : "");
+    div.innerHTML = `<div class="top"><span class="name">${esc(d.path)} ${d.label ? `<span class="meta">${esc(d.label)}</span>` : ""}</span><span class="meta num">${fmtP(p)}</span></div>
+      <div class="bar ${p > 90 ? "warn" : ""}"><i style="width:${p}%"></i></div>
+      <div class="meta num">${fmt(d.free)} free of ${fmt(d.total)}${sc ? ` · ${sc.state === "running" ? "scanning…" : "scanned"}` : ""}</div>`;
+    div.onclick = () => openDrive(d.path);
+    el.appendChild(div);
+  }
+}
+function openDrive(path) {
+  const k = keyOf(path);
+  if (S.scans[k]) { S.root = k; S.nodeId = S.scans[k].rootId; S.tab = "explore"; render(); }
+  else startScan(path);
+}
+
+/* ---------- scanning ---------- */
+async function startScan(path) {
+  try {
+    const j = await api("/api/scan", {path});
+    S.root = j.root; S.nodeId = 0; S.tab = "explore"; S.sel.clear(); updateSel();
+    S.scans[j.root] = {root: j.root, state: "running", rootId: 0};
+    poll(true);
+  } catch (e) { toast(e.message, true); }
+}
+let pollT = null, lastRefresh = 0;
+async function poll(force) {
+  clearTimeout(pollT);
+  if (!S.root) return renderScanbar();
+  try {
+    const st = await api("/api/status?root=" + encodeURIComponent(S.root));
+    const was = S.scans[S.root] && S.scans[S.root].state;
+    S.scans[S.root] = st; S.status = st;
+    renderScanbar(); renderDrives();
+    const now = Date.now();
+    if (force || (st.state === "running" && now - lastRefresh > 2500) || (was === "running" && st.state !== "running")) {
+      lastRefresh = now; render();
+      if (was === "running" && st.state === "done") toast(`Scan finished: ${fmtN(st.files)} files, ${fmt(st.bytes)} in ${fmtT(st.elapsed)}`);
+    }
+    if (st.state === "running") pollT = setTimeout(poll, 800);
+  } catch (e) { toast(e.message, true); }
+}
+function renderScanbar() {
+  const el = $("#scanbar"), st = S.status;
+  if (!S.root || !st) { el.innerHTML = ""; return; }
+  if (st.state === "running") {
+    el.innerHTML = `<span class="spin"></span><span class="pill num">${fmtN(st.files)} files · ${fmt(st.bytes)} · ${fmtT(st.elapsed)}</span><span class="path" title="${esc(st.current)}">${esc(st.current)}</span><span style="flex:1"></span><button class="hbtn" id="cancel">Stop</button>`;
+    $("#cancel").onclick = () => api("/api/cancel", {root: S.root});
+  } else {
+    el.innerHTML = `<span class="pill num">${esc(st.root)} · ${fmt(st.bytes)} · ${fmtN(st.files)} files · ${fmtN(st.dirs)} folders${st.errors ? ` · ${fmtN(st.errors)} unreadable` : ""}${st.state === "cancelled" ? " · stopped early" : ""}</span><span style="flex:1"></span><button class="hbtn" id="rescan">Rescan</button>`;
+    $("#rescan").onclick = () => startScan(st.root);
+  }
+}
+
+/* ---------- selection & delete ---------- */
+function toggleSel(path, size, on) { on ? S.sel.set(path, size) : S.sel.delete(path); updateSel(); }
+function updateSel() {
+  const n = S.sel.size, tot = [...S.sel.values()].reduce((a, b) => a + b, 0);
+  $("#selinfo").textContent = `${n} selected · ${fmt(tot)}`;
+  $("#actionbar").classList.toggle("show", n > 0);
+}
+$("#selclear").onclick = () => { S.sel.clear(); updateSel(); render(); };
+$("#seldelete").onclick = () => confirmDelete();
+function confirmDelete() {
+  const items = [...S.sel.entries()].sort((a, b) => b[1] - a[1]);
+  const tot = items.reduce((a, [, s]) => a + s, 0);
+  const m = $("#modal");
+  m.innerHTML = `<header>Delete ${items.length} item${items.length > 1 ? "s" : ""} (${fmt(tot)})?</header>
+    <div class="body">
+      <ul>${items.slice(0, 200).map(([p, s]) => `<li><span>${esc(p)}</span><span class="num">${fmt(s)}</span></li>`).join("")}${items.length > 200 ? `<li><span>…and ${items.length - 200} more</span></li>` : ""}</ul>
+      <label><input type="checkbox" id="perm"> Delete permanently (skip ${S.windows ? "the Recycle Bin" : "the Trash"}; cannot be undone)</label>
+      <div class="warnbox">${S.windows ? "Items go to the Recycle Bin, so space is only freed once you empty it. " : ""}System folders (Windows, Program Files, drive roots) are always refused.</div>
+    </div>
+    <div class="foot"><span id="delmsg" class="note" style="flex:1;margin:0"></span><button class="btn" id="dcancel">Cancel</button><button class="btn danger" id="dgo">${S.windows ? "Move to Recycle Bin" : "Move to Trash"}</button></div>`;
+  $("#modalbg").classList.add("show");
+  $("#perm").onchange = e => $("#dgo").textContent = e.target.checked ? "Delete permanently" : (S.windows ? "Move to Recycle Bin" : "Move to Trash");
+  $("#dcancel").onclick = closeModal;
+  $("#dgo").onclick = async () => {
+    $("#dgo").disabled = true; $("#delmsg").textContent = "Deleting…";
+    try {
+      const j = await api("/api/delete", {paths: items.map(([p]) => p), permanent: $("#perm").checked});
+      const ok = j.results.filter(r => r.ok), bad = j.results.filter(r => !r.ok);
+      let freed = 0; for (const r of ok) { freed += S.sel.get(r.path) || 0; S.sel.delete(r.path); }
+      updateSel(); closeModal(); render(); loadDrives();
+      if (bad.length) toast(`${ok.length} deleted (${fmt(freed)}). ${bad.length} failed: ${bad[0].error}${bad.length > 1 ? " …" : ""}`, true);
+      else toast(`Deleted ${ok.length} item${ok.length > 1 ? "s" : ""}, ${fmt(freed)}.`);
+    } catch (e) { $("#delmsg").textContent = e.message; $("#dgo").disabled = false; }
+  };
+}
+function closeModal() { $("#modalbg").classList.remove("show"); }
+$("#modalbg").onclick = e => { if (e.target.id === "modalbg") closeModal(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+function reveal(path) { api("/api/reveal", {path}); }
+async function goTo(path) {
+  // Navigate Explore to the folder containing path.
+  const st = S.status; if (!st) return;
+  const sep = S.windows ? "\\" : "/";
+  let rel = path.slice(st.root.length).replace(/^[\\/]+/, "");
+  const parts = rel.split(/[\\/]/); parts.pop();
+  let j = await api(`/api/node?root=${encodeURIComponent(S.root)}&id=${st.rootId}`);
+  for (const p of parts) {
+    const c = j.children.find(c => c.name === p); if (!c) break;
+    j = await api(`/api/node?root=${encodeURIComponent(S.root)}&id=${c.id}`);
+  }
+  S.nodeId = j.node.id; S.tab = "explore"; render();
+}
+
+/* ---------- views ---------- */
+const main = $("#main");
+let renderSeq = 0;
+function saveHash() {
+  const h = S.root ? "#" + new URLSearchParams({root: S.root, id: S.nodeId, tab: S.tab}) : "";
+  if (location.hash !== h) history.replaceState(null, "", h || location.pathname);
+}
+async function render() {
+  const seq = ++renderSeq;
+  saveHash();
+  if (!S.root) return renderHome();
+  const tabs = [["explore","Explore"],["big","Largest files"],["types","File types"],["cleanup","Cleanup"],["dupes","Duplicates"]];
+  const head = `<div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${S.tab === k ? "on" : ""}" data-tab="${k}">${l}</button>`).join("")}</div>`;
+  let body;
+  try {
+    body = await ({explore: viewExplore, big: viewBig, types: viewTypes, cleanup: viewCleanup, dupes: viewDupes}[S.tab])();
+  } catch (e) { body = `<div class="empty">${esc(e.message)}</div>`; }
+  if (seq !== renderSeq) return;
+  main.innerHTML = head; main.append(...(Array.isArray(body) ? body : [frag(body)]));
+  main.querySelectorAll(".tab").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; S.filter = ""; render(); });
+}
+function frag(html) { const t = document.createElement("template"); t.innerHTML = html; return t.content; }
+const q = () => "root=" + encodeURIComponent(S.root);
+
+function renderHome() {
+  main.innerHTML = `<div class="hero"><h1>Your drives</h1><p>Pick a drive to scan it. You can browse while the scan runs; Cleanup and Duplicates fill in when it finishes.</p></div><div class="cards" id="homecards"></div>`;
+  const wrap = $("#homecards");
+  for (const d of S.drives) {
+    const card = document.createElement("div"); card.className = "card drivecard";
+    const p = pct(d.used, d.total);
+    card.innerHTML = `<h3>${esc(d.path)} ${esc(d.label || "")}<span>${esc(d.kind)}${d.fs ? " · " + esc(d.fs) : ""}</span></h3>`;
+    card.appendChild(donut([
+      {label: "Used", value: d.used, color: p > 90 ? "var(--critical)" : "var(--s1)"},
+      {label: "Free", value: d.free, color: "var(--free)"}], {size: 140, centerTop: fmtP(p), centerSub: "used", title: d.path + " usage"}));
+    const act = document.createElement("div"); act.className = "act";
+    const sc = S.scans[keyOf(d.path)];
+    act.innerHTML = `<button class="btn primary">${sc ? "Open scan" : "Scan drive"}</button>${p > 90 ? `<span class="badge system">Almost full</span>` : ""}`;
+    act.querySelector("button").onclick = () => openDrive(d.path);
+    card.appendChild(act); wrap.appendChild(card);
+  }
+}
+
+function sortRows(rows) {
+  const {key, dir} = S.sort;
+  return rows.sort((a, b) => {
+    const x = a[key] ?? 0, y = b[key] ?? 0;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir;
+  });
+}
+function sortHead(label, key, cls = "") {
+  const on = S.sort.key === key;
+  return `<th class="sort ${cls}" data-sort="${key}">${label}${on ? (S.sort.dir < 0 ? " ▾" : " ▴") : ""}</th>`;
+}
+function wireTable(root, rerender) {
+  root.querySelectorAll("th.sort").forEach(th => th.onclick = () => {
+    const k = th.dataset.sort; S.sort = {key: k, dir: S.sort.key === k ? -S.sort.dir : (k === "name" ? 1 : -1)}; rerender();
+  });
+  root.querySelectorAll("input[data-path]").forEach(cb => cb.onchange = () => {
+    toggleSel(cb.dataset.path, +cb.dataset.size, cb.checked); cb.closest("tr").classList.toggle("sel", cb.checked);
+  });
+  root.querySelectorAll("[data-reveal]").forEach(b => b.onclick = () => reveal(b.dataset.reveal));
+  root.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => goTo(b.dataset.goto));
+}
+const check = (path, size) => `<input type="checkbox" data-path="${esc(path)}" data-size="${size}" ${S.sel.has(path) ? "checked" : ""} aria-label="select">`;
+const revealBtn = p => S.windows ? `<button class="iconbtn" data-reveal="${esc(p)}" title="Show in Explorer">${ICON_REVEAL}</button>` : "";
+
+async function viewExplore() {
+  const j = await api(`/api/node?${q()}&id=${S.nodeId}`);
+  const n = j.node, sep = j.sep, total = n.size || 1;
+  const join = name => j.path.endsWith(sep) ? j.path + name : j.path + sep + name;
+  const out = [];
+  out.push(frag(`<div class="crumbs">${j.crumbs.map((c, i) => `${i ? '<span class="sep">›</span>' : ""}<a data-id="${c.id}">${esc(c.name)}</a>`).join("")}</div>
+    <div class="stats">
+      <div class="stat"><b class="num">${fmt(n.size)}</b><small>total size</small></div>
+      <div class="stat"><b class="num">${fmtN(n.files)}</b><small>files</small></div>
+      <div class="stat"><b class="num">${fmtN(n.dirs)}</b><small>folders</small></div>
+      ${(() => { const d = S.drives.find(d => keyOf(j.path).startsWith(keyOf(d.path))); return d ? `<div class="stat"><b class="num">${fmtP(pct(n.size, d.used))}</b><small>of used space on ${esc(d.path)}</small></div>` : ""; })()}
+    </div>`));
+  // donuts
+  const cards = document.createElement("div"); cards.className = "cards";
+  const filesHere = j.files.reduce((a, f) => a + f.size, 0) + 0;
+  const parts = j.children.map(c => ({label: c.name, value: c.size, onClick: () => { S.nodeId = c.id; render(); }}));
+  if (filesHere > 0) parts.push({label: `Files in this folder (${fmtN(j.fileTotal)})`, value: filesHere});
+  const c1 = document.createElement("div"); c1.className = "card";
+  c1.innerHTML = `<h3>Largest folders<span>click a slice to open</span></h3>`;
+  c1.appendChild(parts.length ? donut(topN(parts, 7), {centerSub: "in " + n.name.slice(0, 16), title: "folder sizes"}) : frag(`<div class="empty">Empty folder</div>`));
+  const c2 = document.createElement("div"); c2.className = "card";
+  c2.innerHTML = `<h3>What kind of files<span>by size</span></h3>`;
+  c2.appendChild(j.cats.length ? donut(catSegs(j.cats), {centerSub: "all files", title: "file types"}) : frag(`<div class="empty">No files</div>`));
+  cards.append(c1, c2); out.push(cards);
+  // table
+  let rows = [
+    ...j.children.map(c => ({dir: true, id: c.id, name: c.name, size: c.size, files: c.files, mtime: c.mtime, flag: c.flag, done: c.done, path: join(c.name)})),
+    ...j.files.map(f => ({dir: false, name: f.name, size: f.size, files: 1, mtime: f.mtime, flag: f.flag, cat: f.cat, path: join(f.name)}))];
+  if (S.filter) rows = rows.filter(r => r.name.toLowerCase().includes(S.filter.toLowerCase()));
+  sortRows(rows);
+  const shown = rows.slice(0, 500);
+  const tc = document.createElement("div"); tc.className = "tablecard";
+  tc.innerHTML = `<div class="tools"><input type="search" placeholder="Filter this folder…" value="${esc(S.filter)}" id="filt"><span class="grow"></span>
+      ${j.crumbs.length > 1 ? `<button class="btn small" id="up">↑ Up</button>` : ""}${revealBtn(j.path)}</div>
+    <div class="scroll"><table><thead><tr><th style="width:28px"></th>${sortHead("Name","name")}${sortHead("Size","size","r")}<th>% of folder</th>${sortHead("Files","files","r")}${sortHead("Modified","mtime")}<th>Cleanup</th></tr></thead><tbody>
+    ${shown.map(r => `<tr class="${S.sel.has(r.path) ? "sel" : ""}"><td>${check(r.path, r.size)}</td>
+      <td class="name"><div class="nm">${r.dir ? ICON_DIR : ICON_FILE(r.cat)}${r.dir ? `<a class="t" data-id="${r.id}" title="${esc(r.name)}">${esc(r.name)}</a>${r.done ? "" : ' <span class="spin" style="border-color:var(--border);border-top-color:var(--brand)"></span>'}` : `<span class="t" title="${esc(r.name)}">${esc(r.name)}</span>`}</div></td>
+      <td class="r num">${fmt(r.size)}</td>
+      <td><div class="sizebar"><div class="bar"><i style="width:${pct(r.size, total)}%"></i></div><span class="pct num">${fmtP(pct(r.size, total))}</span></div></td>
+      <td class="r num">${r.dir ? fmtN(r.files) : ""}</td><td class="num">${fmtD(r.mtime)}</td><td>${badge(r.flag)}</td></tr>`).join("")}
+    </tbody></table></div>${rows.length > shown.length ? `<div class="more">Showing the ${shown.length} largest of ${fmtN(rows.length)} items.</div>` : ""}${j.fileTotal > j.files.length ? `<div class="more">Folder has ${fmtN(j.fileTotal)} files; only the largest ${fmtN(j.files.length)} are listed.</div>` : ""}${!rows.length ? `<div class="empty">Nothing here</div>` : ""}`;
+  out.push(tc);
+  setTimeout(() => {
+    main.querySelectorAll("[data-id]").forEach(a => a.onclick = () => { S.nodeId = +a.dataset.id; S.filter = ""; render(); });
+    const up = $("#up"); if (up) up.onclick = () => { S.nodeId = j.crumbs[j.crumbs.length - 2].id; render(); };
+    const f = $("#filt"); f.oninput = () => { S.filter = f.value; clearTimeout(f.h); f.h = setTimeout(async () => { await render(); const g = $("#filt"); g.focus(); g.setSelectionRange(g.value.length, g.value.length); }, 250); };
+    wireTable(main, render);
+  });
+  return out;
+}
+
+async function viewBig() {
+  const j = await api(`/api/big?${q()}`);
+  let rows = j.files.map(f => ({...f, name: f.path.split(/[\\/]/).pop()}));
+  if (S.filter) rows = rows.filter(r => r.path.toLowerCase().includes(S.filter.toLowerCase()));
+  sortRows(rows);
+  const tc = document.createElement("div"); tc.className = "tablecard";
+  tc.innerHTML = `<div class="tools"><input type="search" placeholder="Filter by path…" value="${esc(S.filter)}" id="filt"><span class="grow"></span><span class="note" style="margin:0">Top ${fmtN(j.files.length)} files on this scan</span></div>
+    <div class="scroll"><table><thead><tr><th style="width:28px"></th>${sortHead("File","name")}${sortHead("Size","size","r")}<th>Type</th>${sortHead("Modified","mtime")}<th>Cleanup</th><th></th></tr></thead><tbody>
+    ${rows.map(r => `<tr class="${S.sel.has(r.path) ? "sel" : ""}"><td>${check(r.path, r.size)}</td>
+      <td class="name"><div class="nm">${ICON_FILE(r.cat)}<span class="t" title="${esc(r.path)}">${esc(r.name)}<br><span class="path">${esc(r.path)}</span></span></div></td>
+      <td class="r num">${fmt(r.size)}</td><td>${esc(r.cat)}</td><td class="num">${fmtD(r.mtime)}</td><td>${badge(r.flag)}</td>
+      <td style="white-space:nowrap"><button class="iconbtn" data-goto="${esc(r.path)}" title="Open containing folder">📂</button>${revealBtn(r.path)}</td></tr>`).join("")}
+    </tbody></table></div>${!rows.length ? `<div class="empty">No files over 1 MB found yet</div>` : ""}`;
+  setTimeout(() => { wireFilter(); wireTable(main, render); });
+  return [tc];
+}
+function wireFilter() {
+  const f = $("#filt"); if (!f) return;
+  f.oninput = () => { S.filter = f.value; clearTimeout(f.h); f.h = setTimeout(async () => { await render(); const g = $("#filt"); g.focus(); g.setSelectionRange(g.value.length, g.value.length); }, 250); };
+}
+
+async function viewTypes() {
+  const j = await api(`/api/types?${q()}`);
+  const total = j.cats.reduce((a, c) => a + c.size, 0) || 1;
+  const cards = document.createElement("div"); cards.className = "cards";
+  const c1 = document.createElement("div"); c1.className = "card";
+  c1.innerHTML = `<h3>By category<span>whole scan</span></h3>`;
+  c1.appendChild(donut(catSegs(j.cats), {size: 200, centerSub: "all files"}));
+  const c2 = document.createElement("div"); c2.className = "card";
+  c2.innerHTML = `<h3>Top extensions<span>by size</span></h3>`;
+  c2.appendChild(donut(topN(j.exts.map(e => ({label: "." + e.ext, value: e.size})), 7), {size: 200, centerSub: "all files"}));
+  cards.append(c1, c2);
+  let rows = j.exts.map(e => ({...e, name: e.ext}));
+  sortRows(rows);
+  const tc = document.createElement("div"); tc.className = "tablecard";
+  tc.innerHTML = `<div class="scroll"><table><thead><tr>${sortHead("Extension","name")}<th>Category</th>${sortHead("Size","size","r")}<th>Share</th>${sortHead("Files","count","r")}<th class="r">Avg size</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td><div class="nm">${ICON_FILE(r.cat)}<b>.${esc(r.ext)}</b></div></td><td>${esc(r.cat)}</td><td class="r num">${fmt(r.size)}</td>
+      <td><div class="sizebar"><div class="bar"><i style="width:${pct(r.size, total)}%"></i></div><span class="pct num">${fmtP(pct(r.size, total))}</span></div></td>
+      <td class="r num">${fmtN(r.count)}</td><td class="r num">${fmt(r.size / r.count)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+  setTimeout(() => wireTable(main, render));
+  return [cards, tc];
+}
+
+async function viewCleanup() {
+  const j = await api(`/api/cleanup?${q()}`);
+  if (!j.done) return `<div class="empty"><span class="spin" style="display:inline-block;border-color:var(--border);border-top-color:var(--brand)"></span><br><br>Cleanup suggestions appear when the scan finishes.</div>`;
+  const sum = lvl => j.items.filter(i => i.level === lvl).reduce((a, i) => a + i.size, 0);
+  const safe = sum("safe"), review = sum("review");
+  let rows = j.items.filter(i => S.cleanLevel === "all" || i.level === S.cleanLevel).map(i => ({...i, name: i.path}));
+  if (S.filter) rows = rows.filter(r => r.path.toLowerCase().includes(S.filter.toLowerCase()));
+  sortRows(rows);
+  const cards = document.createElement("div"); cards.className = "cards";
+  const c1 = document.createElement("div"); c1.className = "card";
+  c1.innerHTML = `<h3>Space you could reclaim<span>estimates</span></h3>`;
+  c1.appendChild(donut([{label: "Safe to delete (temp & cache)", value: safe, color: "var(--good)"},
+    {label: "Worth reviewing", value: review, color: "var(--warning)"}], {centerTop: fmt(safe + review), centerSub: "reclaimable"}));
+  const c2 = document.createElement("div"); c2.className = "card";
+  c2.innerHTML = `<h3>How to read this</h3><div class="reason" style="display:grid;gap:8px">
+    <div>${badge(["safe", ""])} Temporary files and caches. Apps rebuild them; deleting is low risk (close the app first).</div>
+    <div>${badge(["review", ""])} Probably unneeded: old installers, logs, build folders, large files untouched for 2+ years. Check first.</div>
+    <div>${badge(["system", ""])} Never listed here. Use Windows Disk Cleanup for system files.</div></div>`;
+  cards.append(c1, c2);
+  const tc = document.createElement("div"); tc.className = "tablecard";
+  tc.innerHTML = `<div class="tools"><select id="lvl"><option value="all">All suggestions</option><option value="safe">Safe to delete</option><option value="review">Review</option></select>
+      <input type="search" placeholder="Filter by path…" value="${esc(S.filter)}" id="filt"><span class="grow"></span>
+      <button class="btn small" id="selsafe">Select all “safe” shown</button></div>
+    <div class="scroll"><table><thead><tr><th style="width:28px"></th>${sortHead("Item","name")}${sortHead("Size","size","r")}<th>Verdict</th><th>Why</th>${sortHead("Modified","mtime")}<th></th></tr></thead><tbody>
+    ${rows.slice(0, 1000).map(r => `<tr class="${S.sel.has(r.path) ? "sel" : ""}"><td>${check(r.path, r.size)}</td>
+      <td class="name"><div class="nm">${r.kind === "dir" ? ICON_DIR : ICON_FILE("")}<span class="t" title="${esc(r.path)}">${esc(r.path)}</span></div></td>
+      <td class="r num">${fmt(r.size)}</td><td>${badge([r.level, r.reason])}</td><td class="reason">${esc(r.reason)}${r.kind === "dir" ? ` · ${fmtN(r.files)} files` : ""}</td><td class="num">${fmtD(r.mtime)}</td>
+      <td style="white-space:nowrap"><button class="iconbtn" data-goto="${esc(r.kind === "dir" ? r.path + "/x" : r.path)}" title="Open in Explore">📂</button>${revealBtn(r.path)}</td></tr>`).join("")}
+    </tbody></table></div>${!rows.length ? `<div class="empty">Nothing flagged. Nice and tidy.</div>` : ""}`;
+  setTimeout(() => {
+    const l = $("#lvl"); l.value = S.cleanLevel; l.onchange = () => { S.cleanLevel = l.value; render(); };
+    $("#selsafe").onclick = () => { rows.filter(r => r.level === "safe").forEach(r => S.sel.set(r.path, r.size)); updateSel(); render(); };
+    wireFilter(); wireTable(main, render);
+  });
+  return [cards, tc];
+}
+
+async function viewDupes() {
+  const j = await api(`/api/dupes?${q()}`);
+  if (!j.done) return `<div class="empty">Duplicates appear when the scan finishes.</div>`;
+  const waste = j.groups.reduce((a, g) => a + g.waste, 0);
+  const tc = document.createElement("div"); tc.className = "tablecard";
+  tc.innerHTML = `<div class="tools"><span><b class="num">${fmt(waste)}</b> in ${fmtN(j.groups.length)} groups of likely duplicates (same name and size, files over 10 MB). Keep one of each.</span></div>
+    <div class="scroll"><table><thead><tr><th style="width:28px"></th><th>Copies</th><th class="r">Size each</th><th></th></tr></thead>
+    ${j.groups.map(g => `<tbody class="dupe"><tr><td></td><td><b>${esc(g.name)}</b> <span class="path">× ${g.paths.length} · ${fmt(g.waste)} extra</span></td><td class="r num">${fmt(g.size)}</td><td></td></tr>
+      ${g.paths.map(p => `<tr class="${S.sel.has(p) ? "sel" : ""}"><td>${check(p, g.size)}</td><td class="name"><div class="nm"><span class="t path" title="${esc(p)}">${esc(p)}</span></div></td><td></td><td style="white-space:nowrap"><button class="iconbtn" data-goto="${esc(p)}" title="Open containing folder">📂</button>${revealBtn(p)}</td></tr>`).join("")}</tbody>`).join("")}
+    </table></div>${!j.groups.length ? `<div class="empty">No duplicates found.</div>` : ""}`;
+  setTimeout(() => wireTable(main, render));
+  return [tc];
+}
+
+/* ---------- boot ---------- */
+$("#logo").onclick = () => { S.root = null; S.status = null; renderScanbar(); renderDrives(); render(); };
+$("#folderform").onsubmit = e => { e.preventDefault(); const v = $("#folderinput").value.trim(); if (v) startScan(v); };
+$("#theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("ds-theme", next); } catch (e) {}
+  render();
+};
+try { const t = localStorage.getItem("ds-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+loadDrives().then(() => {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.get("root") && S.scans[h.get("root")]) {
+    S.root = h.get("root"); S.nodeId = +h.get("id") || 0; S.tab = h.get("tab") || "explore"; poll(true);
+  } else render();
+}).catch(e => toast(e.message, true));
+</script>
+</body>
+</html>
